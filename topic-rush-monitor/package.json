@@ -1,0 +1,15 @@
+{
+  "name": "yd-hot-topic-rush-monitor",
+  "version": "1.0.0",
+  "description": "Binance Web3 Topic Rush monitor",
+  "scripts": {
+    "monitor": "python3 binance_topic_rush_monitor.py",
+    "snapshot": "python3 binance_topic_rush_monitor.py --once",
+    "latest-monitor": "python3 binance_topic_rush_monitor.py --feeds topic-latest",
+    "rising-monitor": "python3 binance_topic_rush_monitor.py --feeds topic-rising",
+    "viral-monitor": "python3 binance_topic_rush_monitor.py --feeds topic-viral"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

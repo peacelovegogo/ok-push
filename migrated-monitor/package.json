@@ -1,0 +1,12 @@
+{
+  "name": "yd-hot-migrated-monitor",
+  "version": "1.0.0",
+  "description": "Binance Web3 migrated meme token monitor",
+  "scripts": {
+    "monitor": "python3 binance_migrated_monitor.py",
+    "snapshot": "python3 binance_migrated_monitor.py --once"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

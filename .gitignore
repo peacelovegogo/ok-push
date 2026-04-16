@@ -1,0 +1,17 @@
+.state/
+.logs/
+.venv/
+chromedriver/
+node_modules/
+migrated-monitor/.env
+topic-rush-monitor/.env
+.launchd/
+__pycache__/
+*.py[cod]
+*.pid
+*.log
+.DS_Store
+.env
+.env.*
+**/.env
+**/.env.*

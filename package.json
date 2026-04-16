@@ -1,0 +1,17 @@
+{
+  "name": "yd-hot",
+  "version": "1.0.0",
+  "description": "Workspace for Binance Web3 migrated monitor and Topic Rush monitor",
+  "scripts": {
+    "start": "sh ./start_monitors.sh",
+    "stop": "sh ./stop_monitors.sh",
+    "status": "sh ./status_monitors.sh",
+    "migrated:monitor": "python3 migrated-monitor/binance_migrated_monitor.py",
+    "migrated:snapshot": "python3 migrated-monitor/binance_migrated_monitor.py --once",
+    "topic:monitor": "python3 topic-rush-monitor/binance_topic_rush_monitor.py",
+    "topic:snapshot": "python3 topic-rush-monitor/binance_topic_rush_monitor.py --once"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

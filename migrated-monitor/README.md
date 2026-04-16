@@ -20,6 +20,7 @@ python3 binance_migrated_monitor.py
 
 默认状态文件会写到当前项目自己的 `.state/binance-migrated-bsc.json`，不会和热点雷达项目混用。
 本地 Telegram 配置默认读取当前目录下的 `.env`。
+可先复制 `.env.example` 为 `.env`，再填入你自己的配置。
 
 ## 常用参数
 

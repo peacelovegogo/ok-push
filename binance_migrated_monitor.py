@@ -25,7 +25,7 @@ TOPIC_RUSH_PAGE_URL = "https://web3.binance.com/zh-CN/trenches/topic-rush?chain=
 
 DEFAULT_CHAIN_ID = "56"
 DEFAULT_LIMIT = 100
-DEFAULT_INTERVAL_SECONDS = 30
+DEFAULT_INTERVAL_SECONDS = 10
 DEFAULT_STATE_FILE = Path(".state/binance-web3-monitor-bsc.json")
 LEGACY_STATE_FILE = Path(".state/binance-migrated-bsc.json")
 DEFAULT_TELEGRAM_PREVIEW = False
@@ -121,7 +121,7 @@ def parse_args() -> argparse.Namespace:
         "--interval",
         type=int,
         default=DEFAULT_INTERVAL_SECONDS,
-        help="Polling interval in seconds. Default: 30",
+        help="Polling interval in seconds. Default: 10",
     )
     parser.add_argument(
         "--state",

@@ -21,6 +21,10 @@ python3 binance_migrated_monitor.py
 默认状态文件会写到当前项目自己的 `.state/binance-migrated-bsc.json`，不会和热点雷达项目混用。
 本地 Telegram 配置默认读取当前目录下的 `.env`。
 可先复制 `.env.example` 为 `.env`，再填入你自己的配置。
+为避免历史老币因接口抖动重新进入榜单时被误推送，默认只通知最近 1 小时内完成迁移的代币；更早的条目会写入状态文件，但不会发送 Telegram / Webhook。
+
+如果你在浏览器里能看到“已迁移”列表，但脚本日志持续显示 `当前 0 条`，通常是 Binance 对非浏览器请求返回了空列表。
+这时可以把浏览器该请求里的完整 `Cookie` 头复制到 `.env` 中的 `MIGRATED_COOKIE_HEADER`，让脚本复用已通过网页验证的会话。
 
 ## 常用参数
 

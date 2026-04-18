@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import html
 import json
 import os
 import sys
@@ -12,10 +13,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-MIGRATED_API_URL = (
-    "https://web3.binance.com/bapi/defi/v1/public/"
-    "wallet-direct/buw/wallet/market/token/pulse/rank/list"
-)
+MIGRATED_API_URLS = [
+    (
+        "https://web3.binance.com/bapi/defi/v1/public/"
+        "wallet-direct/buw/wallet/market/token/pulse/rank/list/ai"
+    ),
+    (
+        "https://web3.binance.com/bapi/defi/v1/public/"
+        "wallet-direct/buw/wallet/market/token/pulse/rank/list"
+    ),
+]
 TOPIC_RUSH_API_URL = (
     "https://web3.binance.com/bapi/defi/v1/public/"
     "wallet-direct/buw/wallet/market/token/social-rush/rank/list"
@@ -26,9 +33,12 @@ TOPIC_RUSH_PAGE_URL = "https://web3.binance.com/zh-CN/trenches/topic-rush?chain=
 DEFAULT_CHAIN_ID = "56"
 DEFAULT_LIMIT = 100
 DEFAULT_INTERVAL_SECONDS = 10
+DEFAULT_MIGRATED_NOTIFY_MAX_AGE_SECONDS = 60 * 60
 DEFAULT_STATE_FILE = Path(".state/binance-web3-monitor-bsc.json")
 LEGACY_STATE_FILE = Path(".state/binance-migrated-bsc.json")
 DEFAULT_TELEGRAM_PREVIEW = False
+EMPTY_MIGRATED_WARNING_INTERVAL_SECONDS = 10 * 60
+LAST_EMPTY_MIGRATED_WARNING_AT = 0.0
 PROTOCOL_LABELS = {
     1001: "Pump.fun",
     1002: "Moonit",
@@ -319,16 +329,20 @@ def load_telegram_config(args: argparse.Namespace) -> Optional[dict]:
     }
 
 
-def http_post_json(url: str, payload: dict) -> dict:
+def http_post_json(url: str, payload: dict, headers: Optional[dict[str, str]] = None) -> dict:
+    request_headers = {
+        "Content-Type": "application/json",
+        "Accept-Encoding": "identity",
+        "User-Agent": "Mozilla/5.0 (compatible; BinanceWeb3Monitor/2.0)",
+    }
+    if headers:
+        request_headers.update(headers)
+
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
         method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Accept-Encoding": "identity",
-            "User-Agent": "Mozilla/5.0 (compatible; BinanceWeb3Monitor/2.0)",
-        },
+        headers=request_headers,
     )
 
     try:
@@ -365,22 +379,74 @@ def fetch_feed_items(feed_name: str, chain_id: str, limit: int) -> list[dict]:
 
 
 def fetch_migrated_tokens(chain_id: str, limit: int) -> list[dict]:
-    payload = http_post_json(
-        MIGRATED_API_URL,
-        {
-            "chainId": chain_id,
-            # rankType=30 is the "已迁移" list used by Binance Web3 Meme Rush.
-            "rankType": 30,
-            "limit": limit,
-        },
+    request_payload = {
+        "chainId": chain_id,
+        # rankType=30 is the "已迁移" list used by Binance Web3 Meme Rush.
+        "rankType": 30,
+        "limit": limit,
+    }
+    headers = build_migrated_request_headers(chain_id)
+    last_payload: Optional[dict] = None
+
+    for api_url in MIGRATED_API_URLS:
+        payload = http_post_json(api_url, request_payload, headers=headers)
+        last_payload = payload
+
+        if payload.get("code") != "000000" or not isinstance(payload.get("data"), list):
+            continue
+
+        if payload["data"]:
+            return [normalize_migrated_token(item, chain_id) for item in payload["data"]]
+
+    if last_payload and last_payload.get("code") == "000000" and isinstance(last_payload.get("data"), list):
+        maybe_warn_on_empty_migrated_result()
+        return []
+
+    if last_payload is None:
+        raise RuntimeError("Unexpected API response: empty response")
+
+    raise RuntimeError(
+        f"Unexpected API response: {last_payload.get('code')} {last_payload.get('message') or ''}".strip()
     )
 
-    if payload.get("code") != "000000" or not isinstance(payload.get("data"), list):
-        raise RuntimeError(
-            f"Unexpected API response: {payload.get('code')} {payload.get('message') or ''}".strip()
-        )
 
-    return [normalize_migrated_token(item, chain_id) for item in payload["data"]]
+def build_migrated_request_headers(chain_id: str) -> dict[str, str]:
+    chain_slug = CHAIN_SLUGS.get(chain_id, "bsc")
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Origin": "https://web3.binance.com",
+        "Referer": MIGRATED_PAGE_URL.format(chain_slug=chain_slug),
+    }
+    user_agent = str(os.getenv("MIGRATED_API_USER_AGENT") or "").strip()
+    if user_agent:
+        headers["User-Agent"] = user_agent
+
+    cookie_header = str(os.getenv("MIGRATED_COOKIE_HEADER") or "").strip()
+    if cookie_header:
+        headers["Cookie"] = cookie_header
+
+    return headers
+
+
+def maybe_warn_on_empty_migrated_result() -> None:
+    global LAST_EMPTY_MIGRATED_WARNING_AT
+
+    now = time.time()
+    if now - LAST_EMPTY_MIGRATED_WARNING_AT < EMPTY_MIGRATED_WARNING_INTERVAL_SECONDS:
+        return
+
+    LAST_EMPTY_MIGRATED_WARNING_AT = now
+    cookie_header = str(os.getenv("MIGRATED_COOKIE_HEADER") or "").strip()
+    if cookie_header:
+        print(
+            f"[{format_now()}] 已迁移代币接口返回空列表 | 已尝试官方 API 与 Cookie 兜底"
+        )
+        return
+
+    print(
+        f"[{format_now()}] 已迁移代币接口返回空列表 | "
+        "如浏览器网页可见，请在 migrated-monitor/.env 中配置 MIGRATED_COOKIE_HEADER 复用浏览器会话"
+    )
 
 
 def fetch_topic_rush_topics(feed_name: str, chain_id: str) -> list[dict]:
@@ -626,6 +692,24 @@ def update_seen_state(feed_name: str, feed_state: dict, items: list[dict], now_i
         feed_state["seen"][item_id] = entry
 
 
+def split_notification_items(feed_name: str, items: list[dict], now_epoch_ms: int) -> tuple[list[dict], list[dict]]:
+    if feed_name != "migrated":
+        return items, []
+
+    cutoff_ms = now_epoch_ms - DEFAULT_MIGRATED_NOTIFY_MAX_AGE_SECONDS * 1000
+    notify_items: list[dict] = []
+    skipped_items: list[dict] = []
+
+    for item in items:
+        migrate_time_ms = int(item.get("migrateTimeMs") or 0)
+        if migrate_time_ms and migrate_time_ms >= cutoff_ms:
+            notify_items.append(item)
+            continue
+        skipped_items.append(item)
+
+    return notify_items, skipped_items
+
+
 def maybe_notify_webhook(webhook_url: str, payload: dict) -> None:
     if not webhook_url:
         return
@@ -681,6 +765,7 @@ def send_telegram_message(
     telegram_config: Optional[dict],
     text: str,
     reply_markup: Optional[dict] = None,
+    parse_mode: Optional[str] = None,
 ) -> None:
     if telegram_config is None:
         return
@@ -692,6 +777,8 @@ def send_telegram_message(
     }
     if reply_markup:
         payload["reply_markup"] = reply_markup
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     send_telegram_api(telegram_config, "sendMessage", payload)
     print(f"[{format_now()}] Telegram delivered")
 
@@ -752,7 +839,7 @@ def send_telegram_topic_card(
 ) -> None:
     message = build_telegram_topic_message(feed_name, index, item)
     keyboard = build_telegram_topic_keyboard(item)
-    send_telegram_message(telegram_config, message, keyboard)
+    send_telegram_message(telegram_config, message, keyboard, parse_mode="HTML")
 
 
 def process_feed(
@@ -766,6 +853,7 @@ def process_feed(
     config = FEED_CONFIGS[feed_name]
     feed_state = get_feed_state(state, feed_name)
     items = fetch_feed_items(feed_name, chain_id, clamp_limit(args.limit))
+    now_epoch_ms = int(time.time() * 1000)
 
     if not feed_state["initializedAt"]:
         update_seen_state(feed_name, feed_state, items, now_iso)
@@ -780,16 +868,23 @@ def process_feed(
         return
 
     new_items = find_new_items(feed_name, items, feed_state)
+    notify_items, skipped_items = split_notification_items(feed_name, new_items, now_epoch_ms)
     update_seen_state(feed_name, feed_state, items, now_iso)
     feed_state["lastCheckAt"] = now_iso
 
     print(
         f"[{format_now()}] {config['label']} 检查完成 | "
-        f"当前 {len(items)} 条 | 新增 {len(new_items)} 条"
+        f"当前 {len(items)} 条 | 新发现 {len(new_items)} 条 | 推送 {len(notify_items)} 条"
     )
 
-    if new_items:
-        print_new_items(feed_name, new_items)
+    if skipped_items:
+        print(
+            f"[{format_now()}] {config['label']} 已跳过 {len(skipped_items)} 条历史迁移币 | "
+            f"迁移时间早于最近 {DEFAULT_MIGRATED_NOTIFY_MAX_AGE_SECONDS // 60} 分钟"
+        )
+
+    if notify_items:
+        print_new_items(feed_name, notify_items)
         maybe_notify_webhook(
             args.webhook,
             {
@@ -799,10 +894,10 @@ def process_feed(
                 "label": config["label"],
                 "detectedAt": now_iso,
                 "chainId": chain_id,
-                "items": new_items,
+                "items": notify_items,
             },
         )
-        maybe_notify_telegram(telegram_config, feed_name, new_items)
+        maybe_notify_telegram(telegram_config, feed_name, notify_items)
     elif args.once:
         print_snapshot(feed_name, items)
 
@@ -978,12 +1073,23 @@ def build_telegram_lines_topic(index: int, item: dict) -> list[str]:
 
 def build_telegram_topic_message(feed_name: str, index: int, item: dict) -> str:
     config = FEED_CONFIGS[feed_name]
+    type_text = escape_html(item["type"] or "-")
+    token_count = format_integer(item["tokenSize"])
+    net_inflow = escape_html(format_compact(item["topicNetInflow"]))
+    net_inflow_1h = escape_html(format_compact(item["topicNetInflow1h"]))
     lines = [
-        f"[Binance Web3] {config['label']} 新增",
-        f"时间: {format_now()}",
+        f"<b>{escape_html(config['label'])} 新增</b>",
+        f"<code>{escape_html(format_now())}</code>",
         "",
+        f"<b>{index}. {escape_html(item['displayName'])}</b>",
+        "",
+        "<b>相关代币</b>",
+        format_topic_symbols_html(item["tokenSymbols"]),
+        "",
+        f"<b>创建</b> {escape_html(item['createTimeText'])}",
+        f"<b>类型</b> {type_text}  |  <b>代币数</b> {token_count}",
+        f"<b>净流入</b> {net_inflow}  |  <b>1h净流入</b> {net_inflow_1h}",
     ]
-    lines.extend(build_telegram_lines_topic(index, item))
     return "\n".join(lines)
 
 
@@ -1087,6 +1193,21 @@ def build_telegram_inline_keyboard(candidates: list[tuple[str, Optional[str]]]) 
         row.append({"text": text, "url": url})
 
     return {"inline_keyboard": [row[:4]]} if row else None
+
+
+def escape_html(value: str) -> str:
+    return html.escape(str(value or ""), quote=False)
+
+
+def format_topic_symbols_html(symbols: list[str], limit: int = 4) -> str:
+    cleaned = unique_non_empty(symbols)
+    if not cleaned:
+        return "-"
+
+    visible = [f"<code>{escape_html(symbol)}</code>" for symbol in cleaned[:limit]]
+    if len(cleaned) > limit:
+        visible.append(f"等 {len(cleaned)} 个")
+    return " ".join(visible)
 
 
 def format_compact(value: Optional[float]) -> str:

@@ -8,6 +8,7 @@
   只监控 Binance Web3 Topic Rush / 热点雷达，并推送热点主题消息
 
 两个目录都可以独立运行和部署。
+根目录只作为仓库容器和说明入口，不再提供统一启动脚本或合并监控脚本。
 
 ## 目录结构
 
@@ -31,6 +32,7 @@
 - `topic-rush-monitor/README.md`
 
 如果你只想单独部署其中一个服务，直接复制对应子项目目录即可。
+根目录不再提供 `package.json`、`start_monitors.sh`、`stop_monitors.sh`、`status_monitors.sh` 这类统一运行入口。
 
 ## 状态文件
 
@@ -47,4 +49,4 @@
 - `topic-rush-monitor/` 默认读取自己目录下的 `.env`
 - `topic-rush-monitor/` 也支持 `TOPIC_TELEGRAM_BOT_TOKEN` / `TOPIC_TELEGRAM_CHAT_ID`
 
-根目录不提供统一运行入口；每个服务都在自己的目录内维护配置、状态文件和启动方式。
+每个服务都在自己的目录内维护配置、状态文件和启动方式。

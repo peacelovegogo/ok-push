@@ -642,7 +642,6 @@ def item_new_line(index: int, item: dict) -> str:
 
 def build_telegram_topic_message(feed_name: str, index: int, item: dict) -> str:
     config = FEED_CONFIGS[feed_name]
-    type_text = escape_html(item["type"] or "-")
     token_count = format_integer(item["tokenSize"])
     net_inflow = escape_html(format_compact(item["topicNetInflow"]))
     net_inflow_1h = escape_html(format_compact(item["topicNetInflow1h"]))
@@ -653,11 +652,10 @@ def build_telegram_topic_message(feed_name: str, index: int, item: dict) -> str:
         "",
         f"<b>{index}. {escape_html(item['displayName'])}</b>",
         "",
-        "<b>相关代币</b>",
+        f"<b>相关代币</b> {token_count} 个",
         format_topic_symbols_html(item["tokenSymbols"]),
         "",
         f"<b>创建</b> {escape_html(item['createTimeText'])}",
-        f"<b>类型</b> {type_text}  |  <b>代币数</b> {token_count}",
         f"<b>净流入</b> {net_inflow}  |  <b>1h净流入</b> {net_inflow_1h}",
     ]
     return "\n".join(lines)
@@ -696,7 +694,7 @@ def format_topic_symbols_html(symbols: list[str], limit: int = 4) -> str:
 
     visible = [f"<code>{escape_html(symbol)}</code>" for symbol in cleaned[:limit]]
     if len(cleaned) > limit:
-        visible.append(f"等 {len(cleaned)} 个")
+        visible.append("...")
     return " ".join(visible)
 
 

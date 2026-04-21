@@ -11,8 +11,6 @@ __pycache__/
 *.pid
 *.log
 .DS_Store
-.env
-.env.*
 **/.env
 **/.env.*
 !.env.example

@@ -1,6 +1,7 @@
 # 已迁移代币监控
 
-这个子项目只监控 Binance Web3 Meme Rush 的“已迁移”代币榜，并把新增代币推送到 Telegram 或 Webhook。
+这个子项目监控 Binance Web3 Meme Rush 的“已迁移”代币榜，并把新增代币推送到 Telegram 或 Webhook。
+目录内已经包含运行所需代码和配置示例，复制 `migrated-monitor/` 即可单独部署。
 
 ## 运行
 
@@ -18,7 +19,7 @@ python3 binance_migrated_monitor.py --once
 python3 binance_migrated_monitor.py
 ```
 
-默认状态文件会写到当前项目自己的 `.state/binance-migrated-bsc.json`，不会和热点雷达项目混用。
+默认状态文件会写到当前项目自己的 `.state/binance-migrated-bsc.json`。
 本地 Telegram 配置默认读取当前目录下的 `.env`。
 可先复制 `.env.example` 为 `.env`，再填入你自己的配置。
 为避免历史老币因接口抖动重新进入榜单时被误推送，默认只通知最近 1 小时内完成迁移的代币；更早的条目会写入状态文件，但不会发送 Telegram / Webhook。
